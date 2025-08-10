@@ -20,6 +20,65 @@ import json
 import os
 import re
 
+def do_first_stage(P, Pm):
+    print("\n开始点击... 第一段")
+    for i in range(7):
+        pyautogui.click(P[i][0], P[i][1])
+        time.sleep(3)
+        pyautogui.click(Pm[0], Pm[1])
+        time.sleep(1.5)
+
+def do_second_stage(P):
+    print("开始点击... 第二段")
+    for _ in range(2):
+        for i in range(7):
+            pyautogui.click(P[i][0], P[i][1])
+            time.sleep(1.5)
+
+def do_wait_stage(interval, Pc=None):
+    print(f"等待{interval}秒...（等待期间可输入新间隔t，回车确认修改）")
+    start_time = time.time()
+    waited = 0
+    last_print = 0
+    while waited < interval:
+        waited = time.time() - start_time
+        time_left = interval - waited
+        # 每60秒输出一次剩余时间，并点击Pc
+        if int(waited) - last_print >= 60 or waited == 0:
+            print(f"剩余等待时间：{int(time_left)}秒。输入新t(如1h/30m/120s)并回车可修改，直接回车继续等待...")
+            last_print = int(waited)
+            if Pc:
+                pyautogui.click(Pc[0], Pc[1])
+        # 检查输入
+        if keyboard.is_pressed('enter'):
+            new_t = input("请输入新的等待时间t（如1h/30m/120s）：").strip()
+            if new_t:
+                m = re.match(r"(\d+)([hms])", new_t.lower())
+                if not m:
+                    print("格式错误，继续等待...")
+                    continue
+                v, u = int(m.group(1)), m.group(2)
+                if u == 'h':
+                    new_interval = v * 3600
+                elif u == 'm':
+                    new_interval = v * 60
+                else:
+                    new_interval = v
+                if new_interval < waited:
+                    print(f"新t({new_interval}s)小于已等待时间({int(waited)}s)，不允许修改！")
+                else:
+                    interval = new_interval
+                    print(f"已修改等待时间t为{new_t}，剩余{int(interval-waited)}秒。")
+        time.sleep(1)
+    print("保险延时15秒...")
+    time.sleep(5)
+
+def do_third_stage(P):
+    print("开始点击... 第三段")
+    for i in range(7):
+        pyautogui.click(P[i][0], P[i][1])
+        time.sleep(3)
+
 def parse_interval(interval_str):
     match = re.match(r"(\d+)([hm])", interval_str.strip().lower())
     if not match:
@@ -113,63 +172,44 @@ def run_mode(config_path):
     if 'pc' in config and len(config['pc']) == 2:
         Pc = config['pc']
 
-    while True:    
-        print("\n开始点击... 第一段")
-        for i in range(7):
-            pyautogui.click(P[i][0], P[i][1])
-            time.sleep(3)
-            pyautogui.click(Pm[0], Pm[1])
-            time.sleep(1.5)
-        # 第二段：P1,1s,P2,1s,...
-        print("开始点击... 第二段")
-        for i in range(7):
-            pyautogui.click(P[i][0], P[i][1])
-            time.sleep(1.5)
-        for i in range(7):
-            pyautogui.click(P[i][0], P[i][1])
-            time.sleep(1.5)
-        print(f"等待{interval}秒...（等待期间可输入新间隔t，回车确认修改）")
-        start_time = time.time()
-        waited = 0
-        last_print = 0
-        while waited < interval:
-            waited = time.time() - start_time
-            time_left = interval - waited
-            # 每60秒输出一次剩余时间，并点击Pc
-            if int(waited) - last_print >= 60 or waited == 0:
-                print(f"剩余等待时间：{int(time_left)}秒。输入新t(如1h/30m/120s)并回车可修改，直接回车继续等待...")
-                last_print = int(waited)
-                if Pc:
-                    pyautogui.click(Pc[0], Pc[1])
-            # 检查输入
-            if keyboard.is_pressed('enter'):
-                new_t = input("请输入新的等待时间t（如1h/30m/120s）：").strip()
-                if new_t:
-                    m = re.match(r"(\d+)([hms])", new_t.lower())
-                    if not m:
-                        print("格式错误，继续等待...")
-                        continue
-                    v, u = int(m.group(1)), m.group(2)
-                    if u == 'h':
-                        new_interval = v * 3600
-                    elif u == 'm':
-                        new_interval = v * 60
-                    else:
-                        new_interval = v
-                    if new_interval < waited:
-                        print(f"新t({new_interval}s)小于已等待时间({int(waited)}s)，不允许修改！")
-                    else:
-                        interval = new_interval
-                        print(f"已修改等待时间t为{new_t}，剩余{int(interval-waited)}秒。")
-            time.sleep(1)
-        print("保险延时5秒...")
-        time.sleep(5)
-        # 第三段：P1,2s,P2,2s,...
-        print("开始点击... 第三段")
-        for i in range(7):
-            pyautogui.click(P[i][0], P[i][1])
-            time.sleep(3)
+    while True:
+        do_first_stage(P, Pm)
+        do_second_stage(P)
+        do_wait_stage(interval, Pc)
+        do_third_stage(P)
         print("本轮点击流程完成，2秒后进入下一轮...（Ctrl+C可终止）")
+        time.sleep(3)
+
+def mode5_wait_third_first_second_wait(config_path):
+    if not os.path.exists(config_path):
+        print(f"配置文件 {config_path} 不存在，请先运行记录模式。")
+        return
+    if not os.path.exists('config.json'):
+        print('未找到config.json，请先记录P1-P7和Pm点位！')
+        return
+    with open('config.json', 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    if 'p1p7' not in config or len(config['p1p7']) != 7:
+        print('config.json中P1-P7点位不正确，请先记录P1-P7点位！')
+        return
+    if 'pm' not in config or len(config['pm']) != 2:
+        print('config.json中Pm点位不正确，请先记录Pm点位！')
+        return
+    if 'interval' not in config:
+        interval = input('config.json中未找到时间间隔，请输入（如1h或30m）：')
+        config['interval'] = interval
+        with open('config.json', 'w', encoding='utf-8') as f2:
+            json.dump(config, f2, ensure_ascii=False, indent=2)
+    P = config['p1p7']
+    Pm = config['pm']
+    interval = parse_interval(config['interval'])
+    Pc = config['pc'] if 'pc' in config and len(config['pc']) == 2 else None
+    while True:
+        do_wait_stage(interval, Pc)
+        do_third_stage(P)
+        do_first_stage(P, Pm)
+        do_second_stage(P)
+        print("本轮流程完成，2秒后进入下一轮...（Ctrl+C可终止）")
         time.sleep(3)
 def record_pc(config_path):
     print("请将鼠标移动到中心点Pc，然后按空格键记录...")
@@ -191,9 +231,9 @@ def record_pc(config_path):
 
 def main():
     config_path = 'config.json'  # 兼容参数
-    print("请选择模式：1-开始烧菜 2-记录菜品位置和时间 3-记录炉灶位置 4-记录确认位置")
-    print("1-开始烧菜（执行自动点击流程）\n2-记录菜品位置和时间（记录Pm和t）\n3-记录炉灶位置（记录P1-P7）\n4-记录确认位置（记录Pc）")
-    mode = input("输入1/2/3/4：")
+    print("请选择模式：1-开始烧菜 2-记录菜品位置和时间 3-记录炉灶位置 4-记录确认位置 5-从等待开始循环")
+    print("1-开始烧菜（第一段-第二段-等待-第三段循环）\n2-记录菜品位置和时间（记录Pm和t）\n3-记录炉灶位置（记录P1-P7）\n4-记录确认位置（记录Pc）\n5-从等待开始循环（等待-第三段-第一段-第二段-等待...循环）")
+    mode = input("输入1/2/3/4/5：")
     if mode == '1':
         run_mode(config_path)
     elif mode == '2':
@@ -202,6 +242,8 @@ def main():
         record_p1p7(config_path)
     elif mode == '4':
         record_pc(config_path)
+    elif mode == '5':
+        mode5_wait_third_first_second_wait(config_path)
     else:
         print("无效输入！")
 
